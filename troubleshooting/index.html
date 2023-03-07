@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- #bbinclude "meta.incl" -->
+<meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous"><link href="/_assets/css/pilot.css" rel="stylesheet"><meta name="author" content="Greg Raven"><link rel="icon" href="/_assets/siteicons/favicon.ico"><meta name="description" content="documents for Netlify Pilots and users"><meta name="keywords" content="Netlify, JAMStack"><meta name="generator" content="BBEdit"><link href="https://www.greg-raven.us/troubleshooting/index.html" rel="canonical">
+<!-- end bbinclude -->
+<title>Troubleshooting</title>
+</head>
+<body><!-- #bbinclude "navbar.incl" -->
+<nav class="navbar navbar-default"><div class="container-fluid"><!-- Brand and toggle get grouped for better mobile display --><div class="navbar-header"><button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false"><span class="sr-only">Toggle navigation</span> <span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span></button></div><!-- Collect the nav links, forms, and other content for toggling --><div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1"><ul class="nav navbar-nav"><li><a href="/index.html" title="Home"><span class="glyphicon glyphicon-home" aria-hidden="true"></span></a></li><li><a href="/dns/index.html">DNS</a></li><li><a href="/tips/index.html">Tips</a></li><li class="dropdown"><a href="/troubleshooting/index.html" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Troubleshooting <span class="caret"></span></a><ul class="dropdown-menu"><li><a href="/troubleshooting/index.html">Introduction</a></li><li role="separator" class="divider"></li><li><a href="/troubleshooting/all-in-one-test.html">All-in-one test</a></li><li><a href="/troubleshooting/dns_probe_finished_nxdomain.html">DNS_Probe_Finished_NXDomain</a></li><li><a href="/troubleshooting/dns-issues.html">DNS issues</a></li><li><a href="/troubleshooting/ssl-issues.html">SSL issues</a></li></ul></li><li><a href="/search.html" title="Search"><span class="glyphicon glyphicon-search" aria-hidden="true"></span></a></li></ul></div><!-- /.navbar-collapse --></div><!-- /.container-fluid --></nav><main class="container"><div class="row"><article class="col-md-9">
+<!-- end bbinclude -->
+
+	<h1>
+		Troubleshooting
+	</h1>
+	<ul>
+		<li>For full documentation visit <a href="https://docs.netlify.com">Netlify|Docs</a>.</li>
+		<li>For support visit <a href="https://community.netlify.com">Netlify|Community</a>.</li>
+	</ul>
+	<p>
+		Use these utilities via the command line, replacing the &ldquo;$apex&rdquo; value with your &ldquo;bare&rdquo; domain name (e.g. domain.com) and the &ldquo;$fqdn&rdquo; value with your fully-qualified domain name (e.g. www.domain.com, blog.domain.com, store.domain.com, etc.)
+	</p>
+	<h2>
+		Determine the domain registrar
+	</h2>
+	<p>
+		This utility scans the whois report for the apex domain for information about the registrar.
+	</p>
+	<pre><code>!/bin/zsh
+apex="greg-raven.us"
+whois $apex | grep "Registrar URL"</code></pre>
+	<p>
+		<b>Note:</b> Because not every whois query returns information in the same format, any blank whois query should be checked by viewing the full whois report.
+	</p>
+	<p>
+		Your results should look something like:
+	</p>
+	<p>
+		<code> Registrar URL: http://www.namecheap.com </code>
+	</p>
+	<h2>
+		Check for name servers
+	</h2>
+	<p>
+		Whois checks for name servers often contain the duplicates. As long as the information is correct, you can disregard this duplication.
+	</p>
+	<pre><code>!/bin/zsh
+apex="greg-raven.us"
+fqdn="www.greg-raven.us"
+linebreak="\n\n\n"
+echo "|============= whois name server for ============"
+echo "| ------------ $apex -------------"
+whois $apex | grep -i "name server"
+echo $linebreak
+echo "|============ dig name server(s) for ============"
+echo "| ----------- $apex ------------"
+echo "| ----------- should agree with whois -----------"
+dig $apex -t NS +short
+printf "\n"
+echo "| ----------- $fqdn -------------"
+echo "| ---- blank if pointing to the apex domain -----"
+dig $fqdn -t NS +short
+	</code>
+	</pre>
+	<p>
+		<b>Note:</b> Because not every whois query returns information in the same format, any blank whois query should be checked by viewing the full whois report.
+	</p>
+	<p>
+		If you are using an external name server, your results will look something like this:
+	</p>
+	<p>
+		<code> dns1.registrar-servers.com. dns2.registrar-servers.com. </code>
+	</p>
+	<p>
+		If you are using Netlify name servers, your results will look something like this:
+	</p>
+	<p>
+		<code> dns2.p04.nsone.net. dns3.p04.nsone.net. dns4.p04.nsone.net. dns1.p04.nsone.net. </code>
+	</p>
+	<h2>
+		Check DNS A entries
+	</h2>
+	<p>
+		If you are using an external name server, it is important to point your apex domain at the Netlify load balancer IP address.
+	</p>
+	<pre><code>
+!/bin/zsh
+apex="greg-raven.us"
+fqdn="www.greg-raven.us"
+echo "|============== dig A record(s) for ============="
+echo "| ------------- $apex -------------"
+echo "| ---- Netlify's load balancer: 104.198.14.52 ---"
+dig $apex -t A +short
+whois "$(dig $apex -t A +short)" | grep Organization
+printf "\n"
+echo "| ------------- $fqdn -------------"
+dig $fqdn -t A +short
+whois "$(dig $fqdn -t A +short)" | grep Organization
+	</code>
+	</pre>
+	<p>
+		If you are using an external name server, your results will look something like this:
+	</p>
+	<p>
+		<code> 104.198.14.52 Organization: Google LLC (GOOGL-2) </code>
+	</p>
+	<p>
+		and:
+	</p>
+	<p>
+		<code> 104.248.78.24 165.227.12.111 Organization: DigitalOcean, LLC (DO-13) </code>
+	</p>
+	<p>
+		If you are using Netlify name servers, your results will look something like this:
+	</p>
+	<p>
+		<code> 192.81.212.192 157.245.130.6 Organization: RIPE Network Coordination Centre (RIPE) </code>
+	</p>
+	<p>
+		and
+	</p>
+	<p>
+		<code> 159.65.216.232 104.248.63.248 Organization: DigitalOcean, LLC (DO-13) </code>
+	</p>
+	<h2>
+		Check DNS CNAME entry
+	</h2>
+	<p>
+		If you are using Netlify DNS (as opposed to DNS at your registrar or Cloudflare or some other third party), there will be no CNAME entry. If your DNS is <i>not</i> with Netlify, then typically your fqdn (e.g. www.domain.com) will point to your Netlify subdomain (e.g. brave-curie-671954.netlify.app).
+	</p>
+	<pre><code>
+!/bin/zsh
+fqdn="www.greg-raven.us"
+echo "|=============== dig CNAME(s) for ==============="
+echo "| -------------- $fqdn ---------------"
+echo "| -------- will be blank for Netlify DNS --------"
+dig $fqdn -t CNAME +short
+	</code>
+	</pre>
+	<h2>
+		Check for inactive DNS zone
+	</h2>
+	<pre><code>
+!/bin/zsh
+apex="greg-raven.us"
+fqdn="www.greg-raven.us"
+	</code>
+	</pre>
+	<h2>
+		Check for DNSSEC
+	</h2>
+	<p>
+		Because Netlify currently does not support DNSSEC, if you have DNSSEC enabled at your registrar Netlify will not be able to issue you an SSL certificate.
+	</p>
+	<pre><code>
+!/bin/zsh
+apex="greg-raven.us"
+whois $apex | grep "DNSSEC"
+	</code>
+	</pre>
+	<p>
+		<b>Note:</b> Unless you have a custom wildcard SSL certificate, the certificate for your apex domain will cover all your subdomains as long as their content is in the same server space.
+	</p>
+	<h2>
+		Check server
+	</h2>
+	<p>
+		Sometimes you may think you have pointed your custom domain to Netlify servers but it is actually still pointing elsewhere. The response to each of these queries should be &ldquo;Netlify&rdquo;.
+	</p>
+	<pre><code>
+!/bin/zsh
+apex="greg-raven.us"
+fqdn="www.greg-raven.us"
+echo "| ----------- $apex ------------"
+curl -s -v http://$apex 2>&amp;1 | grep Server
+printf "\n"
+echo "| ----------- $fqdn -----------"
+curl -s -v http://$fqdn 2>&amp;1 | grep Server
+	</code>
+	</pre>
+	<h2>
+		Host check
+	</h2>
+	<pre><code>
+!/bin/zsh
+apex="greg-raven.us"
+fqdn="www.greg-raven.us"
+echo "|================ host check for ================"
+echo "| --------------- $apex ----------------"
+host $apex
+printf "\n"
+echo "| --------------- $fqdn ---------------"
+host $fqdn
+	</code>
+	</pre>
+	<h2>
+		HTTPS check
+	</h2>
+	<pre><code>
+!/bin/zsh
+apex="greg-raven.us"
+https $apex
+	</code>
+	</pre>
+	<p>
+		<b>Note:</b> You may have to install the https command-line utility. MacOS users may install it using <a href="https://brew.sh">Homebrew</a>.
+	</p>
+	<h2>
+		HTTPStat check
+	</h2>
+	<pre><code>
+!/bin/zsh
+apex="greg-raven.us"
+httpstat $apex
+	</code>
+	</pre>
+	<p>
+		<b>Note:</b> You may have to install the httpstat command-line utility. MacOS users may install it using <a href="https://brew.sh">Homebrew</a>.
+	</p>
+	<h2>
+		Check SSL
+	</h2>
+	<p>
+		When successful, this report will be verbose. When unsuccessful, it will be terse and basically unusable but still indicate that there is a problem.
+	</p>
+	<pre><code>
+!/bin/zsh
+apex="greg-raven.us"
+fqdn="www.greg-raven.us"
+echo "|========== check SSL certificate dates ========="
+echo "| --------------- $apex ----------------"
+sslscan $apex
+printf "\n"
+echo "| --------------- $fqdn ----------------"
+sslscan $fqdn
+	</code>
+	</pre>
+	<p>
+		<b>Note:</b> You may have to install the sslscan command-line utility. MacOS users may install it using <a href="https://brew.sh">Homebrew</a>.
+	</p>
+	<h2>
+		<a href="/troubleshooting/dns_probe_finished_nxdomain.html">How to fix the DNS PROBE FINISHED_NXDOMAIN error</a>
+	</h2>
+<!-- #bbinclude "footer.incl" -->
+</article><!-- .col-md-9 -->
+<aside class="col-md-3 "><div class="panel panel-default"><div class="panel-heading"><p class="panel-title"><b>On this page</b></p></div><div class="panel-body"><ul id="toc"></ul><noscript>You must enable JavaScript to view this content.</noscript></div><!-- /.panel-body --></div><!-- /.panel --></aside><p class="text-center"><a href="https://www.barebones.com/products/bbedit/"><img src="https://www.barebones.com/images/BuiltWithBBEdit.jpg" alt="Built with BBEdit" class="center-block img-thumbnail" style="margin-bottom: 9px;"></a></p>
+</div><!-- .row --></main><footer class="container-fluid"><hr><p>I am not affiliated with Netlify, I am just a user.</p></footer><!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries --><!--[if lt IE 9]>
+	<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+	<script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+<![endif]--><!-- jQuery (necessary for Bootstrap's JavaScript plugins) --><script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script><!-- Include all compiled plugins (below), or include individual files as needed --><script src="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script><script src="/_assets/jTOC/jtoc-min.js"></script><script>
+    $("ul#toc").jtoc({
+        content: "article",
+        headings: "h1, h2"
+    });</script></body></html>
+<!-- end bbinclude -->
